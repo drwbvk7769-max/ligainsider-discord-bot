@@ -11,8 +11,7 @@ def get_all_recent_news():
         response = requests.get(URL, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Der smarte Filter: Wir suchen NUR nach Links, die mit einer Nummer enden!
-        # Das blockiert alle Sidebar-Links wie "Torschützenkönig"
+        # Sucht gezielt nach echten News (Links, die mit einer Nummer enden)
         news_links = soup.find_all('a', href=re.compile(r'/news/.*-\d+/?$'))
         
         articles = []
@@ -20,10 +19,8 @@ def get_all_recent_news():
         
         for item in news_links:
             link = item.get('href')
-            # Text aus dem Link holen
             title = item.get('title') or item.get_text(strip=True)
             
-            # Bilder-Links (ohne Text) und zu kurze Texte ignorieren wir
             if not title or len(title) < 10:
                 continue
                 
@@ -33,19 +30,26 @@ def get_all_recent_news():
                 seen_urls.add(full_url)
                 articles.append({"title": title, "url": full_url})
                 
-        # Wir übergeben nur die obersten 5 echten Artikel zur Kontrolle
         return articles[:5]
     except Exception as e:
-        print("Fehler:", e)
+        print("Fehler beim Abrufen:", e)
         return []
 
 def main():
-    if not WEBHOOK_URL: return
+    if not WEBHOOK_URL: 
+        print("Kein Webhook gefunden!")
+        return
     
     articles = get_all_recent_news()
-    if not articles: return
+    if not articles: 
+        print("Keine Artikel gefunden.")
+        return
     
-    last_link = open(STATE_FILE, "r").read().strip() if os.path.exists(STATE_FILE) else ""
+    # Sicherstellen, dass die Datei existiert, damit Git nicht abstürzt
+    if not os.path.exists(STATE_FILE):
+        open(STATE_FILE, "w").write("")
+        
+    last_link = open(STATE_FILE, "r").read().strip()
     
     new_articles = []
     for article in articles:
@@ -53,7 +57,6 @@ def main():
             break
         new_articles.append(article)
         
-    # Beim ersten Start nach dem Update nur die EINE absolut neuste Meldung schicken
     if not last_link and new_articles:
         new_articles = [new_articles[0]]
         
@@ -65,7 +68,8 @@ def main():
         requests.post(WEBHOOK_URL, json=payload)
         
     if new_articles:
-        open(STATE_FILE, "w").write(new_articles[-1]["url"])
+        # Index 0 ist der absolut neueste Artikel (ganz oben)
+        open(STATE_FILE, "w").write(new_articles[0]["url"])
 
 if __name__ == "__main__":
     main()
