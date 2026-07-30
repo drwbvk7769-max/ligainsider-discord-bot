@@ -20,5 +20,5 @@ jobs:
     - run: |
         git config --global user.name 'Bot'
         git config --global user.email 'bot@github.com'
-        git add last_link.txt
+        git add -A
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update" && git push)
